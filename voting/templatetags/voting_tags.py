@@ -10,80 +10,85 @@ register = template.Library()
 
 class ScoreForObjectNode(template.Node):
     def __init__(self, object, context_var):
-        self.object = object
+        self.object = template.Variable(object)
         self.context_var = context_var
 
     def render(self, context):
         try:
-            object = template.resolve_variable(self.object, context)
+            object = self.object.resolve(context)
+            context[self.context_var] = Vote.objects.get_score(object)
         except template.VariableDoesNotExist:
+            pass
+        finally:
             return ''
-        context[self.context_var] = Vote.objects.get_score(object)
-        return ''
 
 
 class ScoresForObjectsNode(template.Node):
     def __init__(self, objects, context_var):
-        self.objects = objects
+        self.objects = template.Variable(objects)
         self.context_var = context_var
 
     def render(self, context):
         try:
-            objects = template.resolve_variable(self.objects, context)
+            objects = self.objects.resolve(context)
+            context[self.context_var] = Vote.objects.get_scores_in_bulk(objects)
         except template.VariableDoesNotExist:
+            pass
+        finally:
             return ''
-        context[self.context_var] = Vote.objects.get_scores_in_bulk(objects)
-        return ''
 
 
 class VoteByUserNode(template.Node):
     def __init__(self, user, object, context_var):
-        self.user = user
-        self.object = object
+        self.user = template.Variable(user)
+        self.object = template.Variable(object)
         self.context_var = context_var
 
     def render(self, context):
         try:
-            user = template.resolve_variable(self.user, context)
-            object = template.resolve_variable(self.object, context)
+            user = self.user.resolve(context)
+            object = self.object.resolve(context)
+            context[self.context_var] = Vote.objects.get_for_user(object, user)
         except template.VariableDoesNotExist:
+            pass
+        finally:
             return ''
-        context[self.context_var] = Vote.objects.get_for_user(object, user)
-        return ''
 
 
 class VotesByUserNode(template.Node):
     def __init__(self, user, objects, context_var):
-        self.user = user
-        self.objects = objects
+        self.user = template.Variable(user)
+        self.objects = template.Variable(objects)
         self.context_var = context_var
 
     def render(self, context):
         try:
-            user = template.resolve_variable(self.user, context)
-            objects = template.resolve_variable(self.objects, context)
+            user = self.user.resolve(context)
+            objects = self.objects.resolve(context)
+            context[self.context_var] = Vote.objects.get_for_user_in_bulk(objects, user)
         except template.VariableDoesNotExist:
+            pass
+        finally:
             return ''
-        context[self.context_var] = Vote.objects.get_for_user_in_bulk(objects, user)
-        return ''
 
 
 class DictEntryForItemNode(template.Node):
     def __init__(self, item, dictionary, context_var):
-        self.item = item
-        self.dictionary = dictionary
+        self.item = template.Variable(item)
+        self.dictionary = template.Variable(dictionary)
         self.context_var = context_var
 
     def render(self, context):
         try:
-            dictionary = template.resolve_variable(self.dictionary, context)
-            item = template.resolve_variable(self.item, context)
+            dictionary = self.dictionary.resolve(context)
+            item = self.item.resolve(context)
+            context[self.context_var] = dictionary.get(item.id, None)
         except template.VariableDoesNotExist:
+            pass
+        finally:
             return ''
-        context[self.context_var] = dictionary.get(item.id, None)
-        return ''
 
-
+@register.tag(name='score_for_object')
 def do_score_for_object(parser, token):
     """
     Retrieves the total score for an object and the number of votes
@@ -105,6 +110,7 @@ def do_score_for_object(parser, token):
     return ScoreForObjectNode(bits[1], bits[3])
 
 
+@register.tag(name='scores_for_object')
 def do_scores_for_objects(parser, token):
     """
     Retrieves the total scores for a list of objects and the number of
@@ -122,6 +128,53 @@ def do_scores_for_objects(parser, token):
     return ScoresForObjectsNode(bits[1], bits[3])
 
 
+@register.tag(name='votes_for_object')
+def do_votes_for_object(parser, token):
+    """
+Retrieves the number of up-votes and down-votes for a given object and
+stores them in a context variable having ``upvotes`` and
+``downvotes`` attributes.
+
+Example usage:
+
+.. sourcecode:: python
+
+{% votes_for_object widget as widget_votes %}
+
+Widget {{ widget }} has been given {{ widget_votes.upvotes }} positive vote{{ widget_votes.upvotes|pluralize }} and
+{{ widget_votes.downvotes }} negative vote{{ widget_votes.downvotes|pluralize }}
+
+"""
+    bits = token.contents.split()
+    if len(bits) != 4:
+        raise template.TemplateSyntaxError("'%s' tag takes exactly three arguments" % bits[0])
+    if bits[2] != 'as':
+        raise template.TemplateSyntaxError("second argument to '%s' tag must be 'as'" % bits[0])
+    return VotesForObjectNode(bits[1], bits[3])
+
+
+class VotesForObjectNode(template.Node):
+    def __init__(self, object, context_var):
+        self.object = template.Variable(object)
+        self.context_var = context_var
+
+    def render(self, context):
+        try:
+            object = self.object.resolve(context)
+            score_dict = Vote.objects.get_score(object)
+            s = score_dict['score']
+            n = score_dict['num_votes']
+            # Some advanced Maths here :-)
+            upvotes = (n + s) / 2
+            downvotes = (n - s) / 2
+            context[self.context_var] = {'upvotes': upvotes, 'downvotes': downvotes}
+        except template.VariableDoesNotExist:
+            pass
+        finally:
+            return ''
+
+
+@register.tag(name='vote_by_user')
 def do_vote_by_user(parser, token):
     """
     Retrieves the ``Vote`` cast by a user on a particular object and
@@ -142,6 +195,7 @@ def do_vote_by_user(parser, token):
     return VoteByUserNode(bits[1], bits[3], bits[5])
 
 
+@register.tag(name='votes_by_user')
 def do_votes_by_user(parser, token):
     """
     Retrieves the votes cast by a user on a list of objects as a
@@ -162,6 +216,7 @@ def do_votes_by_user(parser, token):
     return VotesByUserNode(bits[1], bits[3], bits[5])
 
 
+@register.tag(name='dict_entry_for_item')
 def do_dict_entry_for_item(parser, token):
     """
     Given an object and a dictionary keyed with object ids - as
@@ -183,15 +238,10 @@ def do_dict_entry_for_item(parser, token):
         raise template.TemplateSyntaxError("fourth argument to '%s' tag must be 'as'" % bits[0])
     return DictEntryForItemNode(bits[1], bits[3], bits[5])
 
-register.tag('score_for_object', do_score_for_object)
-register.tag('scores_for_objects', do_scores_for_objects)
-register.tag('vote_by_user', do_vote_by_user)
-register.tag('votes_by_user', do_votes_by_user)
-register.tag('dict_entry_for_item', do_dict_entry_for_item)
 
 
 # Simple Tags
-
+@register.simple_tag
 def confirm_vote_message(object_description, vote_direction):
     """
     Creates an appropriate message asking the user to confirm the given vote
@@ -207,11 +257,10 @@ def confirm_vote_message(object_description, vote_direction):
         message = 'Confirm <strong>%s</strong> vote for <strong>%%s</strong>.' % vote_direction
     return message % (escape(object_description),)
 
-register.simple_tag(confirm_vote_message)
 
 # Filters
 
-
+@register.filter
 def vote_display(vote, arg=None):
     """
     Given a string mapping values for up and down votes, returns one
@@ -240,4 +289,3 @@ def vote_display(vote, arg=None):
         return up
     return down
 
-register.filter(vote_display)
