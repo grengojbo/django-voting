@@ -175,7 +175,7 @@ class VotesForObjectNode(template.Node):
 
 
 @register.tag(name='votes_for_objects')
-def do_votes_for_object(parser, token):
+def do_votes_for_objects(parser, token):
     """
 Retrieves the number of up-votes and down-votes for a list of  objects and
 stores them in a context variable having ``upvotes`` and
