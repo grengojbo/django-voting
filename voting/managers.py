@@ -111,6 +111,8 @@ class VoteManager(models.Manager):
                          object_id=obj._get_pk_val())
             if vote == 0 and not ZERO_VOTES_ALLOWED:
                 v.delete()
+            if v.vote == vote:
+                raise DuplicateVoteError("user already voted for this object with same value")
             else:
                 v.vote = vote
                 v.save()
@@ -202,3 +204,8 @@ class VoteManager(models.Manager):
                                      user__pk=user.id))
             vote_dict = dict([(vote.object_id, vote) for vote in votes])
         return vote_dict
+
+
+class DuplicateVoteError(Exception):
+    """Base class for exceptions in this module."""
+    pass

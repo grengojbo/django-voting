@@ -5,7 +5,7 @@ from django.http import Http404, HttpResponse, HttpResponseBadRequest, \
 from django.contrib.auth.views import redirect_to_login
 from django.template import loader, RequestContext
 from django.utils import simplejson
-
+from voting.managers import DuplicateVoteError
 from voting.models import Vote
 
 VOTE_DIRECTIONS = (('up', 1), ('down', -1), ('clear', 0))
@@ -82,8 +82,11 @@ def vote_on_object(request, model, direction, post_vote_redirect=None,
                                  'the request, or the object being voted on '
                                  'must define a get_absolute_url method or '
                                  'property.')
-        Vote.objects.record_vote(obj, request.user, vote)
-        return HttpResponseRedirect(next)
+        try:
+            Vote.objects.record_vote(obj, request.user, vote)
+            return HttpResponseRedirect(next)
+        except DuplicateVoteError:
+            return HttpResponseRedirect(next)
     else:
         if not template_name:
             template_name = '%s/%s_confirm_vote.html' % (
@@ -167,7 +170,11 @@ def xmlhttprequest_vote_on_object(request, model, direction,
             'No %s found for %s.' % (model._meta.verbose_name, lookup_kwargs))
 
     # Vote and respond
-    Vote.objects.record_vote(obj, request.user, vote)
+    try:
+        Vote.objects.record_vote(obj, request.user, vote)
+    except DuplicateVoteError:
+        return json_error_response(
+            '%s already voted for %s.' % (request.user, lookup_kwargs))
     return HttpResponse(simplejson.dumps({
         'success': True,
         'score': Vote.objects.get_score(obj),

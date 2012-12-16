@@ -27,7 +27,8 @@ class Vote(models.Model):
     object_id = models.PositiveIntegerField()
     object = generic.GenericForeignKey('content_type', 'object_id')
     vote = models.SmallIntegerField(choices=SCORES)
-    time_stamp = models.DateTimeField(editable=False, auto_now_add=True)
+    created = models.DateTimeField(editable=False, auto_now_add=True)
+    last_update = models.DateTimeField(editable=False, auto_now=True)
 
     objects = VoteManager()
 

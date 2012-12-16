@@ -207,7 +207,7 @@ class VotesForObjectsNode(template.Node):
         try:
             objects = self.objects.resolve(context)
             votes_dict = Vote.objects.get_scores_in_bulk(objects)
-            for obj_id, score_dict in votes_dict:
+            for obj_id, score_dict in votes_dict.iteritems():
                 s = score_dict['score']
                 n = score_dict['num_votes']
                 # Some advanced Maths here :-)
