@@ -110,7 +110,7 @@ def do_score_for_object(parser, token):
     return ScoreForObjectNode(bits[1], bits[3])
 
 
-@register.tag(name='scores_for_object')
+@register.tag(name='scores_for_objects')
 def do_scores_for_objects(parser, token):
     """
     Retrieves the total scores for a list of objects and the number of
