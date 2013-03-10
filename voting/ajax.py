@@ -5,20 +5,20 @@ from dajaxice.decorators import dajaxice_register
 from dajaxice.utils import deserialize_form
 from op.views import get_cat_slug
 from django.db.models import Q
-from userena.utils import signin_redirect, get_profile_model
-from userena import signals as userena_signals
+#from userena.utils import signin_redirect, get_profile_model
+#from userena import signals as userena_signals
 from django.core.urlresolvers import reverse
-from userena import settings as userena_settings
+#from userena import settings as userena_settings
 from django.contrib import messages
 from django.utils.translation import ugettext as _
 from django.contrib.auth import authenticate, login, logout, REDIRECT_FIELD_NAME
-from userena.decorators import secure_required
+#from userena.decorators import secure_required
 from django.http import HttpResponse
 from django.template.context import RequestContext
 from django.shortcuts import render_to_response
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
-from .models import AreaPartners
+#from .models import AreaPartners
 #@secure_required
 #@csrf_exempt
 
@@ -37,9 +37,9 @@ class ErrorList(list):
         if not self: return u''
 
 #@dajaxice_register(method='GET')
-#@ensure_csrf_cookie
-@dajaxice_register(method='POST', name='voites')
-def djax_voites(request, form, success_url=None):
+@ensure_csrf_cookie
+@dajaxice_register(method='GET', name='voites')
+def djax_voites(request, voiteId, voiteModel, success_url=None):
     #f = deserialize_form(form)
     #logger.debug("lot_form: {0}".format(f))
     # subcat = f.getlist('subcat')
@@ -54,7 +54,9 @@ def djax_voites(request, form, success_url=None):
     # #form = signup_form(deserialize_form(form))
     #
     # #dajax.alert("Form is_valid(), your username is: %s" % form.cleaned_data.get('username'))
-    dajax.assign('#linkup17', 'innerHTML','<li>iiiiiiiiiiiiiiiiiiiiiiiiiiiiii</li>')
+    dajax.assign('#voiteRes{0}'.format(voiteId),'innerHTML', '1')
+    #dajax.assign('#linkup17', 'innerHTML','<li>iiiiiiiiiiiiiiiiiiiiiiiiiiiiii</li>')
+
     # try:
     #     ap = AreaPartners.objects.filter(is_public=True)
     #     if f.get('sel_all'):
