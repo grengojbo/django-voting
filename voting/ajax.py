@@ -18,7 +18,11 @@ from django.template.context import RequestContext
 from django.shortcuts import render_to_response
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
-#from .models import AreaPartners
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import get_model
+from voting.managers import DuplicateVoteError
+from django.http import Http404
+from voting.models import Vote
 #@secure_required
 #@csrf_exempt
 
@@ -36,25 +40,35 @@ class ErrorList(list):
     def as_ul(self):
         if not self: return u''
 
+VOTE_DIRECTIONS = (('up', 1), ('down', -1), ('clear', 0))
+
 #@dajaxice_register(method='GET')
 @ensure_csrf_cookie
 @dajaxice_register(method='GET', name='voites')
-def djax_voites(request, voiteId, voiteModel, success_url=None):
-    #f = deserialize_form(form)
-    #logger.debug("lot_form: {0}".format(f))
-    # subcat = f.getlist('subcat')
-    # if subcat:
-    #     logger.debug("subcat: {0}".format(subcat))
-    # #logger.debug("subcat: {0}".format(subcat))
-    dajax = Dajax()
-    # #signup_form = SignupForm
-    # #if userena_settings.USERENA_WITHOUT_USERNAMES:
-    # #    signup_form = SignupFormOnlyEmail
-    #
-    # #form = signup_form(deserialize_form(form))
-    #
-    # #dajax.alert("Form is_valid(), your username is: %s" % form.cleaned_data.get('username'))
-    dajax.assign('#voiteRes{0}'.format(voiteId),'innerHTML', '1')
+def djax_voites(request, object_id, model, direction='up'):
+    lookup_kwargs = {}
+    if object_id:
+        lookup_kwargs['%s__exact' % model._meta.pk.name] = object_id
+    else:
+        raise AttributeError('Generic vote view must be called with either '
+                             'object_id or slug and slug_field.')
+    try:
+        obj = model._default_manager.get(**lookup_kwargs)
+    except ObjectDoesNotExist:
+        raise Http404('No %s found for %s.' %
+                      (model._meta.app_label, lookup_kwargs))
+    try:
+        vote = dict(VOTE_DIRECTIONS)[direction]
+    except KeyError:
+        raise AttributeError("'%s' is not a valid vote type." % direction)
+
+    try:
+        Vote.objects.record_vote(obj, request.user, direction)
+    except DuplicateVoteError:
+        pass
+    res = Vote.objects.get_score(obj)
+    dajax.assign('#num_votes{0}'.format(object_id), 'innerHTML', res.num_votes)
+    dajax.assign('#score{0}'.format(object_id), 'innerHTML', res.score)
     #dajax.assign('#linkup17', 'innerHTML','<li>iiiiiiiiiiiiiiiiiiiiiiiiiiiiii</li>')
 
     # try:
