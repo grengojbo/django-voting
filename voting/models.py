@@ -25,11 +25,9 @@ class Vote(models.Model):
     A vote on an object by a User.
     """
     user = models.ForeignKey(User, related_name='user', blank=True, null=True)
-    sessions = models.CharField(_(u'Sessions'), blank=True, null=True)
-    model_view = models.CharField(_(u'Model View'))
-    #content_type = models.ForeignKey(ContentType)
+    sessions = models.CharField(_(u'Sessions'), max_length=255, blank=True, null=True)
+    model_view = models.CharField(_(u'Model View'), max_length=255)
     object_id = models.PositiveIntegerField()
-    #object = generic.GenericForeignKey('content_type', 'object_id')
     vote = models.SmallIntegerField(choices=SCORES)
     created = models.DateTimeField(editable=False, auto_now_add=True)
     last_update = models.DateTimeField(editable=False, auto_now=True)
@@ -51,10 +49,12 @@ class Vote(models.Model):
     def is_downvote(self):
         return self.vote == -1
 
+
+
 class ViewsObj(models.Model):
     #user = models.ForeignKey(User, related_name='user', blank=True, null=True)
     #sessions = models.CharField(_(u'Sessions'), blank=True, null=True)
-    model_view = models.CharField(_(u'Model View'), unique=True)
+    model_view = models.CharField(_(u'Model View'), max_length=255, unique=True)
     object_id = models.PositiveIntegerField()
     views = models.PositiveIntegerField(_(u'views'), default=0)
     last_update = models.DateTimeField(editable=False, auto_now=True)
