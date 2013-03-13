@@ -36,14 +36,12 @@ if supports_aggregates:
 
 
 class VoteManager(models.Manager):
-    def get_score(self, obj):
+    def get_score(self, o, m):
         """
         Get a dictionary containing the total score for ``obj`` and
         the number of votes it's received.
         """
-        ctype = ContentType.objects.get_for_model(obj)
-        result = self.filter(object_id=obj._get_pk_val(),
-                             content_type=ctype).extra(
+        result = self.filter(object_id=o, model_view=m).extra(
             select={
                 'score': 'COALESCE(SUM(vote), 0)',
                 'num_votes': 'COALESCE(COUNT(vote), 0)',
@@ -54,21 +52,15 @@ class VoteManager(models.Manager):
             'num_votes': int(result[1]),
         }
 
-    def get_scores_in_bulk(self, objects):
+    def get_scores_in_bulk(self, o, m):
         """
         Get a dictionary mapping object ids to total score and number
         of votes for each object.
         """
-        object_ids = [o._get_pk_val() for o in objects]
-        if not object_ids:
-            return {}
-
-        ctype = ContentType.objects.get_for_model(objects[0])
-
         if supports_aggregates:
             queryset = self.filter(
-                object_id__in=object_ids,
-                content_type=ctype,
+                object_id__in=o,
+                model_view=m,
             ).values(
                 'object_id',
             ).annotate(
@@ -77,8 +69,8 @@ class VoteManager(models.Manager):
             )
         else:
             queryset = self.filter(
-                object_id__in=object_ids,
-                content_type=ctype,
+                object_id__in=o,
+                model_view=m,
                 ).extra(
                     select={
                         'score': 'COALESCE(SUM(vote), 0)',
@@ -87,16 +79,9 @@ class VoteManager(models.Manager):
                 ).values('object_id', 'score', 'num_votes')
             queryset.query.group_by.append('object_id')
 
-        vote_dict = {}
-        for row in queryset:
-            vote_dict[row['object_id']] = {
-                'score': int(row['score']),
-                'num_votes': int(row['num_votes']),
-            }
+        return queryset
 
-        return vote_dict
-
-    def record_vote(self, obj, user, vote):
+    def record_vote(self, o, m, user, ses, vote):
         """
         Record a user's vote on a given object. Only allows a given user
         to vote once, though that vote may be changed.
@@ -105,10 +90,9 @@ class VoteManager(models.Manager):
         """
         if vote not in (+1, 0, -1):
             raise ValueError('Invalid vote (must be +1/0/-1)')
-        ctype = ContentType.objects.get_for_model(obj)
         try:
-            v = self.get(user=user, content_type=ctype,
-                         object_id=obj._get_pk_val())
+            #v = self.get(user=user, object_id=int(obj), model_view=model)
+            v = self.get(sessions_hash=ses, object_id=o, model_view=m)
             if vote == 0 and not ZERO_VOTES_ALLOWED:
                 v.delete()
             if v.vote == vote:
@@ -119,8 +103,8 @@ class VoteManager(models.Manager):
         except models.ObjectDoesNotExist:
             if not ZERO_VOTES_ALLOWED and vote == 0:
                 return
-            self.create(user=user, content_type=ctype,
-                        object_id=obj._get_pk_val(), vote=vote)
+            #self.create(user=user, object_id=obj, model_view=model, vote=vote)
+            self.create(sessions_hash=ses, object_id=o, model_view=m, vote=vote)
 
     def get_top(self, Model, limit=10, reversed=False):
         """

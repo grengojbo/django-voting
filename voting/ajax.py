@@ -22,7 +22,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import get_model
 from voting.managers import DuplicateVoteError
 from django.http import Http404
-from voting.models import Vote
+from voting.models import Vote, ViewsObj
+from django.db.models import F
 #@secure_required
 #@csrf_exempt
 
@@ -42,56 +43,47 @@ class ErrorList(list):
 
 VOTE_DIRECTIONS = (('up', 1), ('down', -1), ('clear', 0))
 
+@dajaxice_register(method='GET', name='jboVote')
+def djax_views(request, items, model):
+    dajax = Dajax()
+    res = Vote.objects.get_scores_in_bulk(items, model)
+    for r in res:
+        dajax.assign('#num_votes{0}'.format(r['object_id']), 'innerHTML', r['num_votes'])
+        dajax.assign('#score{0}'.format(r['object_id']), 'innerHTML', r['score'])
+    viewDisable = Vote.objects.filter(object_id__in=items, model_view=model, sessions_hash=request.session)
+    for v in viewDisable:
+        dajax.add_css_class('#vote-{0}'.format(v.pk), 'disabled')
+    return HttpResponse(dajax.json(), mimetype="application/json")
+
+@dajaxice_register(method='GET', name='jboviews')
+def djax_views(request, items, model):
+    dajax = Dajax()
+    for item in items:
+        o, c = ViewsObj.objects.get_or_create(model_view=model, object_id=item)
+        o.views += 1
+        o.save()
+        dajax.assign('#num-view-{0}'.format(item), 'innerHTML', o.views)
+    return HttpResponse(dajax.json(), mimetype="application/json")
+
 #@dajaxice_register(method='GET')
 @ensure_csrf_cookie
 @dajaxice_register(method='GET', name='voites')
 def djax_voites(request, object_id, model, direction='up'):
-    lookup_kwargs = {}
-    if object_id:
-        lookup_kwargs['%s__exact' % model._meta.pk.name] = object_id
-    else:
-        raise AttributeError('Generic vote view must be called with either '
-                             'object_id or slug and slug_field.')
-    try:
-        obj = model._default_manager.get(**lookup_kwargs)
-    except ObjectDoesNotExist:
-        raise Http404('No %s found for %s.' %
-                      (model._meta.app_label, lookup_kwargs))
+    dajax = Dajax()
+
     try:
         vote = dict(VOTE_DIRECTIONS)[direction]
     except KeyError:
         raise AttributeError("'%s' is not a valid vote type." % direction)
 
     try:
-        Vote.objects.record_vote(obj, request.user, direction)
+        Vote.objects.record_vote(object_id, model, request.user, request.session, vote)
     except DuplicateVoteError:
         pass
-    res = Vote.objects.get_score(obj)
-    dajax.assign('#num_votes{0}'.format(object_id), 'innerHTML', res.num_votes)
-    dajax.assign('#score{0}'.format(object_id), 'innerHTML', res.score)
-    #dajax.assign('#linkup17', 'innerHTML','<li>iiiiiiiiiiiiiiiiiiiiiiiiiiiiii</li>')
-
-    # try:
-    #     ap = AreaPartners.objects.filter(is_public=True)
-    #     if f.get('sel_all'):
-    #         logger.debug("sel_all: {0}".format(f.get('sel_all')))
-    #         if f.get('cat'):
-    #             ap = ap.filter(cat=get_cat_slug(f.get('cat')))
-    #     elif subcat:
-    #         #if f.get('cat'):
-    #         #    ap = ap.filter(cat=get_cat_slug(f.get('cat')))
-    #         logger.debug("subcat: {0}".format(subcat))
-    #         #for sc in subcat:
-    #         #    logger.debug("subcat item: {0}".format(sc))
-    #         # TODO: переделать на нормальный поиск пока все результаты
-    #         ap = ap.filter(category__in=subcat)
-    #     #logger.debug("items count: {0}".format(subcat.count()))
-    #     render = render_to_string('op/ajax_search.html', {'items': ap})
-    #     dajax.assign('#search_res', 'innerHTML', render)
-    #     dajax.script('ajax_search_res();')
-    # except Exception, e:
-    #     logger.debug(e)
-    #     dajax.assign('#search_res', 'innerHTML',u'')
-    # #a = ap[0]
+    res = Vote.objects.get_score(object_id, model)
+    dajax.assign('#num_votes{0}'.format(object_id), 'innerHTML', res['num_votes'])
+    #logger.error('AAA {0}'.format(request.user.username))
+    #dajax.assign('#num_votes{0}'.format(object_id), 'innerHTML', request.user.username)
+    dajax.assign('#score{0}'.format(object_id), 'innerHTML', res['score'])
     return HttpResponse(dajax.json(), mimetype="application/json")
 

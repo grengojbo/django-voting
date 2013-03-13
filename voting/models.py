@@ -24,8 +24,8 @@ class Vote(models.Model):
     """
     A vote on an object by a User.
     """
-    user = models.ForeignKey(User, related_name='user', blank=True, null=True)
-    sessions = models.CharField(_(u'Sessions'), max_length=255, blank=True, null=True)
+    #user = models.ForeignKey(User, related_name='user', blank=True, null=True)
+    sessions_hash = models.CharField(_(u'Sessions'), max_length=255, blank=True, null=True)
     model_view = models.CharField(_(u'Model View'), max_length=255)
     object_id = models.PositiveIntegerField()
     vote = models.SmallIntegerField(choices=SCORES)
@@ -38,7 +38,7 @@ class Vote(models.Model):
         db_table = 'votes'
         # One vote per user per object
         #unique_together = (('user', 'content_type', 'object_id'),)
-        unique_together = (('user', 'model_view', 'object_id'), ('sessions', 'model_view', 'object_id'),)
+        unique_together = (('sessions_hash', 'model_view', 'object_id'),)
 
     def __unicode__(self):
         return u'{0}: {1} on {2}'.format(self.user, self.vote, self.model_view)
@@ -54,13 +54,14 @@ class Vote(models.Model):
 class ViewsObj(models.Model):
     #user = models.ForeignKey(User, related_name='user', blank=True, null=True)
     #sessions = models.CharField(_(u'Sessions'), blank=True, null=True)
-    model_view = models.CharField(_(u'Model View'), max_length=255, unique=True)
+    model_view = models.CharField(_(u'Model View'), max_length=255)
     object_id = models.PositiveIntegerField()
     views = models.PositiveIntegerField(_(u'views'), default=0)
     last_update = models.DateTimeField(editable=False, auto_now=True)
 
     class Meta:
         db_table = 'votes_view'
+        unique_together = (('model_view', 'object_id'),)
 
     def __unicode__(self):
         return u'{0}: {1}'.format(self.model_view, self.views)
