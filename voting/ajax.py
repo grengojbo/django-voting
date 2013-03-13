@@ -56,13 +56,15 @@ def djax_views(request, items, model):
     return HttpResponse(dajax.json(), mimetype="application/json")
 
 @dajaxice_register(method='GET', name='jboviews')
-def djax_views(request, items, model):
+def djax_views(request, items, model, updates=None, noView=None):
     dajax = Dajax()
     for item in items:
         o, c = ViewsObj.objects.get_or_create(model_view=model, object_id=item)
-        o.views += 1
-        o.save()
-        dajax.assign('#num-view-{0}'.format(item), 'innerHTML', o.views)
+        if updates is None:
+            o.views += 1
+            o.save()
+        if noView is None:
+          dajax.assign('#num-view-{0}'.format(item), 'innerHTML', o.views)
     return HttpResponse(dajax.json(), mimetype="application/json")
 
 #@dajaxice_register(method='GET')
