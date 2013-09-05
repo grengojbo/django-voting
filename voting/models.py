@@ -50,7 +50,6 @@ class Vote(models.Model):
         return self.vote == -1
 
 
-
 class ViewsObj(models.Model):
     #user = models.ForeignKey(User, related_name='user', blank=True, null=True)
     #sessions = models.CharField(_(u'Sessions'), blank=True, null=True)
@@ -65,4 +64,3 @@ class ViewsObj(models.Model):
 
     def __unicode__(self):
         return u'{0}: {1}'.format(self.model_view, self.views)
-    

@@ -1,12 +1,11 @@
-from django.conf.urls.defaults import *
-
+# -*- mode: python; coding: utf-8; -*-
+from django.conf.urls import patterns, url
+from . import views
 
 urlpatterns = patterns('',
-    url(r"^vote/(?P<app_label>[\w\.-]+)/(?P<model_name>\w+)/"\
-        "(?P<object_id>\d+)/(?P<direction>up|down|clear)/$",
-        "voting.views.vote_on_object_with_lazy_model", {
-            "allow_xmlhttprequest": True,
-        },
-        name="voting_vote"
-    ),
+    (r'^$', views.api_root),
+    url(r"^vote/(?P<app_label>[\w\.-]+)/(?P<model_name>\w+)/(?P<object_id>\d+)/(?P<direction>up|down|clear)/$",
+        views.ItemVote.as_view(), name="voting_vote"),
+    url(r"^vote/(?P<app_label>[\w\.-]+)/(?P<model_name>\w+)/$", views.ItemVoteView.as_view(), name="voting_vote_view"),
+    url(r"^view/(?P<app_label>[\w\.-]+)/(?P<model_name>\w+)/$", views.ItemView.as_view(), name="voting_view"),
 )

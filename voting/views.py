@@ -1,3 +1,4 @@
+# -*- mode: python; coding: utf-8; -*-
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import get_model
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, \
@@ -5,8 +6,25 @@ from django.http import Http404, HttpResponse, HttpResponseBadRequest, \
 from django.contrib.auth.views import redirect_to_login
 from django.template import loader, RequestContext
 from django.utils import simplejson
-from voting.managers import DuplicateVoteError
-from voting.models import Vote
+import json
+from .managers import DuplicateVoteError
+from .models import Vote, ViewsObj
+from .serializers import ItemViewSerializer, ItemVoteSerializer, ItemVoteDisableSerializer
+
+from django.utils.encoding import smart_unicode
+
+from rest_framework import generics
+from rest_framework import renderers
+from rest_framework.decorators import api_view, renderer_classes, permission_classes
+from rest_framework.response import Response
+from rest_framework.reverse import reverse
+from rest_framework import views
+from rest_framework import status
+from rest_framework import permissions
+
+API_RENDERERS = (renderers.JSONRenderer, )
+# if API_RENDER_HTML:
+#     API_RENDERERS = (renderers.BrowsableAPIRenderer, renderers.JSONRenderer)
 
 VOTE_DIRECTIONS = (('up', 1), ('down', -1), ('clear', 0))
 
@@ -122,7 +140,7 @@ def vote_on_object_with_lazy_model(request, app_label, model_name, *args,
 
 def json_error_response(error_message):
     return HttpResponse(simplejson.dumps(dict(success=False,
-                                              error_message=error_message)),content_type='application/json')
+                                              error_message=error_message)), content_type='application/json')
 
 
 def xmlhttprequest_vote_on_object(request, model, direction,
@@ -179,3 +197,74 @@ def xmlhttprequest_vote_on_object(request, model, direction,
         'success': True,
         'score': Vote.objects.get_score(obj),
     }), content_type='application/json')
+
+@api_view(('GET',))
+@renderer_classes(API_RENDERERS)
+def api_root(request, format='None'):
+    """
+    This is the entry point for the API.
+    """
+    return Response({
+            'pages': '',
+    })
+
+
+class ItemView(views.APIView):
+    renderer_classes = API_RENDERERS
+    #serializer_class = ItemViewSerializer
+
+    def get(self, request, app_label, model_name, format=None):
+        # if not PERMISSIONS.can_edit(request.user, Page.objects.get(page_content_items__id=pk)):
+        #     return _403_FORBIDDEN_RESPONSE
+        #ValueError
+        items = json.loads(request.GET.get('items'))
+        updates = request.GET.get('updates', 'no')
+        model = "{0}.{1}".format(app_label, model_name)
+        if updates != 'no':
+            for item in items:
+                o, c = ViewsObj.objects.get_or_create(model_view=model, object_id=item)
+                o.views += 1
+                o.save()
+        res = ViewsObj.objects.filter(object_id__in=items, model_view=model)
+        serializer = ItemViewSerializer(res, many=True)
+        # return Response({'id': items, 'app': app_label, 'model': model_name})
+        return Response(serializer.data)
+
+
+class ItemVoteView(views.APIView):
+    renderer_classes = API_RENDERERS
+    #serializer_class = ItemViewSerializer
+
+    def get(self, request, app_label, model_name, format=None):
+        # if not PERMISSIONS.can_edit(request.user, Page.objects.get(page_content_items__id=pk)):
+        #     return _403_FORBIDDEN_RESPONSE
+        #ValueError
+        items = json.loads(request.GET.get('items'))
+        model = "{0}.{1}".format(app_label, model_name)
+        items = Vote.objects.get_scores_in_bulk(items, model)
+        viewDisable = Vote.objects.filter(object_id__in=items, model_view=model, sessions_hash=request.session)
+        serializer = ItemVoteSerializer(items, many=True)
+        serializerDisable = ItemVoteDisableSerializer(viewDisable, many=True)
+        # return Response({'id': items, 'app': app_label, 'model': model_name})
+        return Response({'items_res': serializer.data, 'items_disable': serializerDisable.data})
+
+
+class ItemVote(views.APIView):
+    renderer_classes = API_RENDERERS
+    #serializer_class = ItemViewSerializer
+
+    def get(self, request, app_label, model_name, object_id, direction, format=None):
+        model = "{0}.{1}".format(app_label, model_name)
+        try:
+            vote = dict(VOTE_DIRECTIONS)[direction]
+        except KeyError:
+            raise AttributeError("'%s' is not a valid vote type." % direction)
+        try:
+            Vote.objects.record_vote(object_id, model, request.user, request.session, vote)
+        except DuplicateVoteError:
+            pass
+
+        res = Vote.objects.get_score(object_id, model)
+        # serializer = ItemViewSerializer(res, many=False)
+        # return Response({'object_id': object_id, 'model': model})
+        return Response(res)

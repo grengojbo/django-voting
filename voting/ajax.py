@@ -3,7 +3,7 @@
 from dajax.core import Dajax
 from dajaxice.decorators import dajaxice_register
 from dajaxice.utils import deserialize_form
-from op.views import get_cat_slug
+#from op.views import get_cat_slug
 from django.db.models import Q
 #from userena.utils import signin_redirect, get_profile_model
 #from userena import signals as userena_signals
@@ -39,9 +39,12 @@ class ErrorList(list):
         return self.as_ul()
 
     def as_ul(self):
-        if not self: return u''
+        if not self:
+            return u''
+
 
 VOTE_DIRECTIONS = (('up', 1), ('down', -1), ('clear', 0))
+
 
 @dajaxice_register(method='GET', name='jboVote')
 def djax_views(request, items, model):
@@ -64,7 +67,7 @@ def djax_views(request, items, model, updates=None, noView=None):
             o.views += 1
             o.save()
         if noView is None:
-          dajax.assign('#num-view-{0}'.format(item), 'innerHTML', o.views)
+            dajax.assign('#num-view-{0}'.format(item), 'innerHTML', o.views)
     return HttpResponse(dajax.json(), mimetype="application/json")
 
 #@dajaxice_register(method='GET')

@@ -48,6 +48,7 @@ class VoteManager(models.Manager):
         }).values_list('score', 'num_votes')[0]
 
         return {
+            'id': int(o),
             'score': int(result[0]),
             'num_votes': int(result[1]),
         }
